@@ -1,13 +1,15 @@
 #include <iostream>
 #include "Winsock2.h"
 #include <ws2tcpip.h>
-
 #include <string>
-
+#include <vector>
+#include <fstream>
+#include <algorithm>
 
 #pragma comment(lib, "Ws2_32.lib")
 
 using namespace std;
+
 
 int main(){
 	// initialize socket
@@ -21,13 +23,12 @@ int main(){
 
 	// create a socket
 	SOCKET listening = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listening = INVALID_SOCKET) {
+	if (listening == INVALID_SOCKET) {
 		cerr << "Can't create" << endl; 
 		return 2;
 	}
 
 	// bind an ip adress and port to the socket 
-
 	sockaddr_in hint; 
 	hint.sin_family = AF_INET;
 	hint.sin_port = htons(54000);
@@ -35,11 +36,9 @@ int main(){
 	bind(listening, (sockaddr*)&hint, sizeof(hint));
 	
 	// tell Winsock the socket is for listening
-
 	listen(listening, SOMAXCONN);
 
 	// wait for connection 
-
 	sockaddr_in client; 
 	int clientSize = sizeof(client);
 
@@ -64,6 +63,21 @@ int main(){
 
 	// while loop: accept and echo message back to client
 	char buf[4096];
+	vector <string>origtxt; 
+	ifstream data("text.txt");
+	while (!(data.eof())) {
+		string tmp;
+		getline(data,tmp); 
+		origtxt.push_back(tmp);
+	}
+	data.close();
+	struct Mess {
+		int num;
+		string mes;
+	};
+
+	vector <Mess> chtxt;
+
 	while (true) {
 		ZeroMemory(buf, 4096);
 		// wait for client to send data
@@ -77,11 +91,43 @@ int main(){
 			break;
 		}
 		// echo message back to client
+		ifstream file("text.txt");
+		int i = 0; 
+		while (!(file.eof())) {
+			string tmp;
+			getline(file, tmp);
+			if (i >= origtxt.size()) {
+				origtxt.push_back(tmp);
+				Mess mess;
+				mess.num = i;
+				mess.mes = tmp;
+				chtxt.push_back(mess);
+			}
+			else {
+				if (origtxt[i] != tmp) {
+					origtxt[i] = tmp;
+					Mess mess;
+					mess.num = i;
+					mess.mes = tmp;
+					chtxt.push_back(mess);
+				}
+			}
+			i++;
+		}
+		file.close();
+		string curmess;
+		if (chtxt.size() > 0) {
+			curmess = to_string(chtxt[0].num) + "," + chtxt[0].mes;
+			chtxt.erase(chtxt.begin(), chtxt.begin()+1);
+		}
+		else
+			curmess = "No changes";
+		send(clientSocket, curmess.c_str(),curmess.size() + 1, 0);
 
-		send(clientSocket, buf, bytesReceived + 1, 0);
 	}
 	// close the socket 
 	closesocket(clientSocket);
+
 	//cleanup winsock
 	WSACleanup();
 	
